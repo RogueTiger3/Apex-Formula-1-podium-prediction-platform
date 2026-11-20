@@ -1,0 +1,63 @@
+name: Update data, models and predictions
+
+on:
+  schedule:
+    # Every six hours. Runs with nothing new finish in a couple of minutes and commit nothing.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      retrain:
+        description: "Force a full retrain and backtest"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apex-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore API response cache
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: apex-api-cache-${{ github.run_id }}
+          restore-keys: apex-api-cache-
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Run update pipeline
+        id: update
+        run: |
+          ARGS="--trigger github-actions"
+          if [ "${{ inputs.retrain }}" = "true" ]; then ARGS="$ARGS --retrain"; fi
+          python -m apex.pipeline update $ARGS | tee update_summary.json
+
+      - name: Commit updated database and models
+        run: |
+          if python -c "import json,sys; d=json.load(open('update_summary.json')); sys.exit(0 if d.get('changed') else 1)"; then
+            git config user.name "apex-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/apex.db models/
+            git commit -m "Automated update: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          else
+            echo "No new data: nothing to commit."
+          fi
