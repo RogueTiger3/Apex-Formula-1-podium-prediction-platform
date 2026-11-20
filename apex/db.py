@@ -147,6 +147,38 @@ def session(path: Path | str | None = None):
 def init_db(path: Path | str | None = None) -> None:
     with session(path) as conn:
         conn.executescript(SCHEMA)
+        repair_blobs(conn)
+
+
+def _py(v):
+    """Convert numpy scalars to plain Python values.
+
+    sqlite3 stores numpy integers as raw 8-byte blobs, which later breaks reads.
+    """
+    if v is None or isinstance(v, (str, bytes)):
+        return v
+    if hasattr(v, "item") and not isinstance(v, (list, dict)):
+        try:
+            v = v.item()
+        except (ValueError, AttributeError):
+            return v
+    if isinstance(v, float) and v != v:  # NaN -> NULL
+        return None
+    return v
+
+
+def repair_blobs(conn: sqlite3.Connection) -> int:
+    """Decode numeric values that an earlier version stored as 8-byte numpy blobs."""
+    fixed = 0
+    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+    for t in tables:
+        for col in [r[1] for r in conn.execute(f"PRAGMA table_info({t})")]:
+            rows = conn.execute(f"SELECT rowid, {col} FROM {t} WHERE typeof({col})='blob'").fetchall()
+            for rowid, blob in rows:
+                val = int.from_bytes(blob, "little", signed=True) if len(blob) == 8 else None
+                conn.execute(f"UPDATE {t} SET {col}=? WHERE rowid=?", (val, rowid))
+                fixed += 1
+    return fixed
 
 
 def upsert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
@@ -156,7 +188,7 @@ def upsert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
     cols = list(rows[0].keys())
     sql = (f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) "
            f"VALUES ({', '.join('?' for _ in cols)})")
-    conn.executemany(sql, [tuple(r.get(c) for c in cols) for r in rows])
+    conn.executemany(sql, [tuple(_py(r.get(c)) for c in cols) for r in rows])
     return len(rows)
 
 
@@ -167,7 +199,7 @@ def insert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
         return 0
     cols = list(rows[0].keys())
     sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
-    conn.executemany(sql, [tuple(r.get(c) for c in cols) for r in rows])
+    conn.executemany(sql, [tuple(_py(r.get(c)) for c in cols) for r in rows])
     return len(rows)
 
 

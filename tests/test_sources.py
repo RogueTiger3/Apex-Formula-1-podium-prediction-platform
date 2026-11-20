@@ -48,3 +48,18 @@ def test_http_falls_back_to_stale_cache(synthetic_db, monkeypatch):
     monkeypatch.setattr(http._session, "get", lambda url, timeout: Resp())
     monkeypatch.setattr(http.time, "sleep", lambda s: None)
     assert http.get_json(url, max_age=0) == [{"cached": True}]
+
+
+def test_numpy_values_are_stored_as_numbers(synthetic_db):
+    import numpy as np
+    from apex import db
+    with db.session() as conn:
+        db.upsert(conn, "race_weather", [dict(race_id="x", kind="forecast", temp_c=np.float64(20.5),
+                                              precip_mm=np.float64("nan"), precip_prob_pct=np.int64(35))])
+        conn.execute("INSERT INTO race_weather (race_id, kind, precip_prob_pct) VALUES ('y', 'forecast', ?)",
+                     (np.int64(7).tobytes(),))  # what an older version wrote
+    db.init_db()  # repairs old blobs
+    rows = db.query("SELECT race_id, typeof(precip_prob_pct) t, precip_prob_pct, precip_mm FROM race_weather ORDER BY race_id")
+    assert "blob" not in set(rows["t"])
+    assert list(rows["precip_prob_pct"]) == [35, 7]
+    assert rows["precip_mm"].isna().all()
