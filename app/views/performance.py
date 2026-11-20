@@ -20,7 +20,9 @@ version = reg["model_version"].iloc[0]
 stage = st.radio("Prediction stage", list(config.STAGES), index=3, horizontal=True, format_func=lambda s: f"{s} · {config.STAGES[s]}")
 sel = reg.set_index("stage").loc[stage]
 mets = ui.q("SELECT * FROM backtest_metrics WHERE model_version=? AND stage=?", (version, stage))
-bt = ui.q("SELECT * FROM backtest_predictions WHERE model_version=? AND stage=?", (version, stage))
+bt = ui.models.load_backtest(stage)
+if len(bt) and bt["model_version"].iloc[0] != version:
+    bt = bt.iloc[0:0]
 if mets.empty:
     st.info("No backtest results stored for this model version.")
     st.stop()

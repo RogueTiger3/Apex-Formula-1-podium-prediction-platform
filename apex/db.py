@@ -102,12 +102,6 @@ CREATE TABLE IF NOT EXISTS model_registry (
     data_cutoff_race TEXT, n_train INTEGER, n_features INTEGER, metrics_json TEXT,
     params_json TEXT, path TEXT, is_active INTEGER, PRIMARY KEY (model_version, stage));
 
-CREATE TABLE IF NOT EXISTS backtest_predictions (
-    model_version TEXT, stage INTEGER, algorithm TEXT, season INTEGER, race_id TEXT,
-    driver_id TEXT, constructor_id TEXT, prob_podium REAL, actual_podium INTEGER,
-    actual_position INTEGER,
-    PRIMARY KEY (model_version, stage, algorithm, race_id, driver_id));
-
 CREATE TABLE IF NOT EXISTS backtest_metrics (
     model_version TEXT, stage INTEGER, algorithm TEXT, season TEXT, n_races INTEGER,
     n_rows INTEGER, accuracy REAL, precision_ REAL, recall REAL, f1 REAL, brier REAL,

@@ -40,9 +40,8 @@ def retrain(tune: bool = True) -> str:
         sm.sim_params = fit_scenario_params(bt_sel, df)
         imp = explain.global_importance(sm, models.stage_frame(df, stage).query("season == season.max()"))
         stage_models[stage] = sm
+        models.save_backtest(preds, stage)
         with db.session() as conn:
-            conn.execute("DELETE FROM backtest_predictions WHERE stage=?", (stage,))  # keep latest version only
-            db.upsert(conn, "backtest_predictions", preds.to_dict("records"))
             db.upsert(conn, "backtest_metrics", mets.to_dict("records"))
             db.upsert(conn, "feature_importance", imp.assign(model_version=version, stage=stage).to_dict("records"))
             conn.execute("UPDATE model_registry SET is_active=0 WHERE stage=?", (stage,))

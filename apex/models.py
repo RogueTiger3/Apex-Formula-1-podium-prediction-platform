@@ -313,6 +313,22 @@ def save(models: dict[int, StageModel], version: str) -> str:
     return path.name
 
 
+def save_backtest(preds: pd.DataFrame, stage: int) -> None:
+    """Out-of-sample backtest predictions for the current model version, one compressed file per stage.
+
+    Kept out of the database because they are rewritten on every retrain and
+    would otherwise bloat the committed database.
+    """
+    out = preds.drop(columns=["stage"]).copy()
+    out["prob_podium"] = out["prob_podium"].round(5)
+    out.to_csv(config.MODEL_DIR / f"backtest_stage{stage}.csv.gz", index=False, compression="gzip")
+
+
+def load_backtest(stage: int) -> pd.DataFrame:
+    path = config.MODEL_DIR / f"backtest_stage{stage}.csv.gz"
+    return pd.read_csv(path) if path.exists() else pd.DataFrame()
+
+
 def load_active() -> dict[int, StageModel] | None:
     pointer = config.MODEL_DIR / "active.json"
     if not pointer.exists():

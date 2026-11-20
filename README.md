@@ -160,7 +160,7 @@ three podium places.
 
 **Model selection is automatic and based on genuine out-of-sample testing**: the algorithm with the lowest mean
 log loss across all backtest seasons is deployed for that stage. More complex models are not assumed to be better,
-and at the pre-weekend stage the plain logistic regression has won.
+and in the current build plain logistic regression wins the post-practice stage.
 
 ### 4. From podium probabilities to everything else
 
@@ -236,14 +236,26 @@ rate** (share of each race's three highest-probability drivers who actually made
 **Benchmarks** are fitted the same way (lookup tables of historical podium rate by rank):
 qualifying position, recent finishing positions (last 5), and constructor championship position.
 
-The Model Performance page shows the current figures for every stage and season. The snapshot from the first
-full training run (2018–2026 backtest, 193 races) is in the pull request description. Headline:
+The Model Performance page shows the current figures for every stage and season. Snapshot from the first
+full training run (backtest seasons 2018–2026, 193 races, 3,889–4,400 driver entries per stage):
 
-* **Pre-race stage**: the ensemble beats the qualifying-position benchmark, but **only by about 5% in Brier
-  score**, and its podium hit rate is about the same (~66–67%). Qualifying already contains most of the
-  predictable signal; the model's main gain is better-calibrated probabilities further down the order.
-* **Pre-weekend stage** is where the model adds the most over simple benchmarks, because there is no qualifying
-  result to lean on yet.
+| Stage | Selected model | Log loss | Brier | ROC-AUC | Podium hit rate | Best benchmark (Brier / hit rate) |
+|---|---|---:|---:|---:|---:|---|
+| 1 · Pre-weekend | Random forest | 0.251 | 0.0794 | 0.911 | 58.6% | Recent form: 0.0903 / 53.2% |
+| 2 · Post-practice | Logistic regression | 0.249 | 0.0794 | 0.913 | 58.7% | Recent form: 0.0903 / 53.2% |
+| 3 · Post-qualifying | Ensemble | 0.216 | 0.0682 | 0.938 | 66.2% | Qualifying position: 0.0698 / **66.8%** |
+| 4 · Pre-race | Ensemble | 0.211 | 0.0663 | 0.941 | 67.0% | Qualifying position: 0.0698 / 66.8% |
+
+Headline:
+
+* **After qualifying the model is only slightly better than "the top three qualifiers make the podium"**: about
+  2–5% better Brier score and log loss, and the same or a slightly *lower* podium hit rate at the post-qualifying
+  stage. Qualifying already contains most of the predictable signal; the model's gain is better-calibrated
+  probabilities, not better top-three picks.
+* **Before qualifying** the model is clearly better than simple benchmarks (about 12% better Brier score and
+  5 points more podium hits than recent finishing positions), because there is no grid to lean on yet.
+* **Practice data barely helps yet** (stage 2 ≈ stage 1), because OpenF1 practice laps only exist from 2023, so
+  the models have three seasons to learn their value from.
 
 These are reported as they are. The app flags it on the performance page whenever the best model is less than
 3% better than the strongest benchmark.
@@ -269,6 +281,8 @@ retraining. Once the race result is in, the Model Performance page scores it.
      Complete past seasons are skipped; upserts on natural keys mean nothing is duplicated.
    * **Retrains only when a race result has newly become final** (or no model exists): full backtest, model
      selection, simulator parameter estimation, SHAP importance, then a new model version is saved and registered.
+     Out-of-sample backtest predictions are written to `models/backtest_stage*.csv.gz` (kept out of the database
+     so it stays small).
      Previous model files are kept (last three on disk, all in git history) and the registry keeps every version.
    * Predicts the next race at every stage whose inputs exist, storing each new prediction.
    * Logs the run (`update_log`), including failures. An API failure is recorded and the run carries on with
