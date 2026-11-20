@@ -220,8 +220,12 @@ def metrics(df: pd.DataFrame, prob_col="prob", y_col="y") -> dict:
 # ---------------------------------------------------------------------------
 
 def stage_frame(df: pd.DataFrame, stage: int) -> pd.DataFrame:
-    """Rows usable for a stage: completed races, with qualifying data for stages 3-4."""
-    d = df[(df["is_target"] == 0) & df["y_podium"].notna()].copy()
+    """Rows usable for a stage: confirmed (final) results, with qualifying data for stages 3-4.
+
+    Provisional results still feed the form features of later races, but are not
+    used as training labels until they are confirmed.
+    """
+    d = df[(df["is_target"] == 0) & df["y_podium"].notna() & (df["result_status"] == "final")].copy()
     if stage >= 3:
         d = d[d["quali_pos"].notna()]
     return d

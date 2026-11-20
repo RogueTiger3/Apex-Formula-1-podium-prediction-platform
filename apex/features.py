@@ -184,12 +184,12 @@ def build(target_race_id: str | None = None, t: dict[str, pd.DataFrame] | None =
     """
     t = t or _load()
     races = t["races"].copy()
-    races["race_date"] = pd.to_datetime(races["race_start_utc"], utc=True)
+    races["race_date"] = pd.to_datetime(races["race_start_utc"], utc=True, format="ISO8601")
     res = t["results"].copy()
     if target_race_id is not None and target_race_id not in set(res["race_id"]):
         ent = entry_list(target_race_id, t).assign(race_id=target_race_id)
         res = pd.concat([res, ent], ignore_index=True)
-    df = res.merge(races[["race_id", "season", "round", "circuit_id", "race_date", "race_start_utc",
+    df = res.merge(races[["race_id", "season", "round", "circuit_id", "race_date", "race_start_utc", "result_status",
                           "quali_start_utc", "sprint_start_utc", "has_sprint"]], on="race_id", how="left")
     df = df.sort_values(["race_date", "race_id", "driver_id"]).reset_index(drop=True)
     df["team"] = df["constructor_id"].map(lambda c: TEAM_LINEAGE.get(c, c))
@@ -384,7 +384,7 @@ def build(target_race_id: str | None = None, t: dict[str, pd.DataFrame] | None =
         df[PRACTICE_FEATURES] = np.nan
 
     # sprint before qualifying (2024+ format) is usable at the post-qualifying stage
-    sprint_first = pd.to_datetime(df["sprint_start_utc"], utc=True) < pd.to_datetime(df["quali_start_utc"], utc=True)
+    sprint_first = pd.to_datetime(df["sprint_start_utc"], utc=True, format="ISO8601") < pd.to_datetime(df["quali_start_utc"], utc=True, format="ISO8601")
     df["sprint_pos"] = df["sprint_pos_raw"]
     df["sprint_pos_preq"] = np.where(sprint_first, df["sprint_pos_raw"], np.nan)
 
@@ -404,7 +404,7 @@ def build(target_race_id: str | None = None, t: dict[str, pd.DataFrame] | None =
     df["sc_flag"] = df["race_id"].map(per_race["sc"])
     df["race_pace_actual"] = df["race_pace"]
     keep = (["race_id", "season", "round", "circuit_id", "race_date", "driver_id", "constructor_id", "team",
-             "is_target", "position", "grid_actual", "status", "wet", "sc_flag", "dnf", "race_pace_actual"]
+             "is_target", "result_status", "position", "grid_actual", "status", "wet", "sc_flag", "dnf", "race_pace_actual"]
             + [f"y_{k}" for k in LABELS] + sorted(set(sum(STAGE_FEATURES.values(), []))))
     out = df[keep].copy()
     num = sorted(set(sum(STAGE_FEATURES.values(), []))) + [f"y_{k}" for k in LABELS] + [
