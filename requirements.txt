@@ -1,0 +1,13 @@
+# Exact versions: saved models are pickled, so the training (GitHub Actions) and
+# dashboard environments must use the same library versions.
+pandas==2.3.3
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+shap==0.54.1
+joblib==1.6.0
+requests==2.34.2
+streamlit==1.67.0
+plotly==7.1.0
+pytest==9.1.1
