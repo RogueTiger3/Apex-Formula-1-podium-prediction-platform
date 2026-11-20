@@ -46,6 +46,7 @@ jobs:
       - name: Run update pipeline
         id: update
         run: |
+          set -o pipefail  # a failed pipeline run must fail this step, not be hidden by tee
           ARGS="--trigger github-actions"
           if [ "${{ inputs.retrain }}" = "true" ]; then ARGS="$ARGS --retrain"; fi
           python -m apex.pipeline update $ARGS | tee update_summary.json
